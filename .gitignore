@@ -1,0 +1,5 @@
+__pycache__/
+sobel_*/
+study_*/
+*.saif
+*.csv
