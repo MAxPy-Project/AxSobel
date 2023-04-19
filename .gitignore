@@ -3,3 +3,6 @@ sobel_*/
 study_*/
 *.saif
 *.csv
+images/*/*bw.png
+images/*/*blur.png
+images/*/*gray.png

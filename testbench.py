@@ -1,5 +1,5 @@
+from MAxPy import results
 import sys
-import psnr
 from skimage.metrics import structural_similarity
 import cv2
 import numpy as np
@@ -7,14 +7,7 @@ import importlib
 import os.path
 import os
 
-def sobel_testbench(mod, log_file_path=None, keep_output_image=False):
-
-    log_file_path = None
-
-    if log_file_path is not None:
-        log_file_handle = open(log_file_path, 'w')
-        original_stdout = sys.stdout
-        sys.stdout = log_file_handle
+def sobel_testbench(ckt=None, results_filename=None):
 
     image_list = [
         "images/birds/birds.jpeg",
@@ -25,9 +18,11 @@ def sobel_testbench(mod, log_file_path=None, keep_output_image=False):
 
     thresdhold = 127
 
+    rst = results.ResultsTable(results_filename, ["ssim", "accuracy"])
+
     print(">>> testbench init")
 
-    sobel_filter = mod.sobel()
+    sobel_filter = ckt.sobel()
 
     print(f"  > circuit: {sobel_filter.name()}")
     print(f"  > parameters: {sobel_filter.parameters}")
@@ -41,11 +36,7 @@ def sobel_testbench(mod, log_file_path=None, keep_output_image=False):
     print("")
 
     ssim_value = 0
-    psnr_value = 0
     accuracy = 0
-    recall = 0
-    precision = 0
-    fscore = 0
 
     for input_image_name in image_list:
         
@@ -179,12 +170,10 @@ def sobel_testbench(mod, log_file_path=None, keep_output_image=False):
 
         # save images got from testbench
         #cv2.imwrite(f"{image_name}_{sobel_filter.name()}_{sobel_filter.parameters}_gray.png", img_out1)
-        if keep_output_image is True:
-            cv2.imwrite(output_image_name, img_out2)
+        cv2.imwrite(output_image_name, img_out2)
         (score, diff) = structural_similarity(ref_bw, img_out2, full=True)
         
         ssim_value += score
-        psnr_value += psnr.PSNR(ref_bw, img_out2)
 
         den = (tp + fp + tn + fn)
         if den != 0:
@@ -192,80 +181,26 @@ def sobel_testbench(mod, log_file_path=None, keep_output_image=False):
         else:
             accuracy += 100
 
-        den = (tp + fn)
-        if den != 0:
-            recall += (tp) / den
-        else:
-            recall += 100
-
-        den = (tp + fp)
-        if den != 0:
-            precision += (tp) / den
-        else:
-            precision += 100
-
-        den = (precision + recall)
-        if den != 0:
-            fscore += 2*(precision * recall) / den
-        else:
-            fscore += 100
-
-        #print("    > ssim: %.3f%%, accuracy: %.3f%%" % (ssim_value*100.0, accuracy*100.0))
-
     ssim_average = ssim_value / len(image_list)
     accuracy_average = accuracy * 100 / len(image_list)
 
-    area_s = '%.2f' % (sobel_filter.area)
-    power_s = '%.2f' % (sobel_filter.power)
-    timing_s = '%.2f' % (sobel_filter.timing)
-    ssim_s = '%.4f' % (ssim_average)
-    psnr_s = '%.2f' % (psnr_value / len(image_list))
-    accuracy_s = '%.2f' % (accuracy_average)
-    recall_s = '%.2f' % (recall * 100 / len(image_list))
-    precision_s = '%.2f' % (precision * 100 / len(image_list))
-    fscore_s = '%.2f' % (fscore * 100 / len(image_list))
+    rst.add(sobel_filter, {"ssim": ssim_average, "accuracy": accuracy_average})
 
-    result_string = '{top};{param};{a};{pw};{tm};{p};{s};{tot};{tp};{tn};{fp};{fn};{acc};{rec};{prec};{fs}\n'.format(
-        top = sobel_filter.name(),
-        param = sobel_filter.parameters,
-        a = area_s,
-        pw = power_s,
-        tm = timing_s,
-        p = psnr_s, 
-        s = ssim_s,
-        tot=width*height,
-        tp=tp,
-        tn=tn,
-        fp=fp,
-        fn=fn,
-        acc=accuracy_s,
-        rec=recall_s,
-        prec=precision_s,
-        fs=fscore_s
-        )
+    print(f"> average result: ssim {ssim_average:.4f}, acc {accuracy_average:.2f}%")
 
-    result_file = open(result_file_path, "a")
-    result_file.write(result_string)
-    result_file.close()
-    print(f"    > average result: ssim {ssim_s}, acc {accuracy_s}%")
-
-    if mod.saif_opt is True:
-        sobel_filter.saif_path = f"{sobel_filter.name()}_{sobel_filter.parameters}.saif"
-        sobel_filter.saif_on_the_fly(1)
+    # if mod.saif_opt is True:
+    #     sobel_filter.saif_path = f"{sobel_filter.name()}_{sobel_filter.parameters}.saif"
+    #     sobel_filter.saif_on_the_fly(1)
 
     print(">>> testbench end")
     print("")
-
-    if log_file_path is not None:
-        log_file_handle.close()
-        sys.stdout = original_stdout
 
     if ssim_average >= 0.85:
         prun_flag = True
     else:
         prun_flag = False
 
-    if mod.saif_opt is True:
+    if ckt.saif_opt is True:
         return prun_flag, sobel_filter.node_info
     else:
         return prun_flag, []
@@ -274,8 +209,7 @@ def sobel_testbench(mod, log_file_path=None, keep_output_image=False):
 if __name__ == '__main__':
 
     mod_list = [
-        "sobel_exact_build.sobel",
-        "sobel_onecomp_build.sobel",
+        "sobel_exact.sobel",
     ]
 
     for mod_name in mod_list:
